@@ -1,29 +1,38 @@
 package com.ecoharbor.ecoharborbackend.controller;
 
-import com.ecoharbor.ecoharborbackend.model.LoginDto;
-import com.ecoharbor.ecoharborbackend.model.Role;
-import com.ecoharbor.ecoharborbackend.model.SignUpDto;
-import com.ecoharbor.ecoharborbackend.model.User;
+import com.ecoharbor.ecoharborbackend.model.*;
 import com.ecoharbor.ecoharborbackend.repository.RoleRepository;
 import com.ecoharbor.ecoharborbackend.repository.UserRepository;
+import com.ecoharbor.ecoharborbackend.security.JwtUtils;
+import com.ecoharbor.ecoharborbackend.security.UserDetailsImpl;
 import com.ecoharbor.ecoharborbackend.service.UserService;
+import jakarta.servlet.http.HttpServletRequest;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
+import java.util.Base64;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 public class UserController {
+    @Autowired
+    JwtUtils jwtUtils;
 
     @Autowired
     private UserService userService;
@@ -42,50 +51,60 @@ public class UserController {
 
 
 
+
+
+
     @PostMapping("/api/auth/login")
-    public ResponseEntity<String> authenticateUser(@RequestBody LoginDto user){
-        System.out.println("Inside controller");
-        System.out.println(user.getUsername()+" "+user.getPassword());
-        UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken(user.getUsername(), user.getPassword());
-        System.out.println("token: "+token);
-        Authentication authentication = authenticationManager.authenticate(token);
-        System.out.println("step 2 reached");
+    public ResponseEntity<?> authenticateUser(@Validated @RequestBody LoginDto loginRequest) {
+
+        Authentication authentication = authenticationManager
+                .authenticate(new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
+
         SecurityContextHolder.getContext().setAuthentication(authentication);
-        return new ResponseEntity<>("User signed-in successfully!.", HttpStatus.OK);
+
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+
+        ResponseCookie jwtCookie = jwtUtils.generateJwtCookie(userDetails);
+
+        List<String> roles = userDetails.getAuthorities().stream()
+                .map(item -> item.getAuthority())
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
+                .body(new UserInfoResponse(userDetails.getId(),
+                        userDetails.getUsername(),
+                        (Collection<GrantedAuthority>) userDetails.getAuthorities()));
     }
 
+
     @PostMapping("/api/auth/signup")
-    public ResponseEntity<?> registerUser(@RequestBody SignUpDto signUpDto){
-
-        // add check for username exists in a DB
-        if(userRepository.existsByUsername(signUpDto.getUsername())){
-            return new ResponseEntity<>("Username is already taken!", HttpStatus.BAD_REQUEST);
+    public ResponseEntity<?> registerUser(@Validated @RequestBody SignUpDto signUpRequest) {
+        if (userRepository.existsByUsername(signUpRequest.getUsername())) {
+            return ResponseEntity.badRequest().body(new MessageResponse("Error: Username is already taken!"));
         }
-
-
         // create user object
         User user = new User();
-        user.setUsername(signUpDto.getUsername());
-        user.setPassword(passwordEncoder.encode(signUpDto.getPassword()));
+        user.setUsername(signUpRequest.getUsername());
+        user.setPassword(passwordEncoder.encode(signUpRequest.getPassword()));
 
         Role roles = roleRepository.findByName("ROLE_ADMIN").get();
         user.setRoles(Collections.singleton(roles));
 
         userRepository.save(user);
 
-        return new ResponseEntity<>("User registered successfully", HttpStatus.OK);
 
+        return ResponseEntity.ok(new MessageResponse("User registered successfully!"));
+    }
+
+    @PostMapping("/api/auth/signout")
+    public ResponseEntity<?> logoutUser() {
+        ResponseCookie cookie = jwtUtils.getCleanJwtCookie();
+        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(new MessageResponse("You've been signed out!"));
     }
 
 
-    @PostMapping("/api/auth/test")
-    public ResponseEntity<String> test(@RequestBody String s){
-        System.out.println("test");
-        return ResponseEntity.ok("Test Successful");
-    }
 
-    @GetMapping("/loggedintest")
-    public ResponseEntity<String> loggedInTest(){
-        return ResponseEntity.ok("Logged in Successfully");
-    }
+
+
 }
