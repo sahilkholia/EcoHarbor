@@ -1,0 +1,23 @@
+<h2 mat-dialog-title>Hi {{this.username}}</h2>
+<form (ngSubmit)="book(myForm)" #myForm="ngForm" ngNativeValidate>
+    <mat-dialog-content>
+    <p>Select the Quantity of {{this.itemData.name}} you need.</p>
+    <mat-form-field>
+        <mat-label>Quantity</mat-label>
+        <input matInput ngModel name="ReqQty" required/>  
+    </mat-form-field>
+    
+    </mat-dialog-content>
+    <mat-dialog-content>
+        <p>Enter your Phone Number.</p>
+        <mat-form-field>
+        <mat-label>Ph.No.</mat-label>
+        <span matTextPrefix>+91 &nbsp;</span>
+        <input type="tel" matInput placeholder="555-555-1234" ngModel name="ph" required>
+        </mat-form-field>
+    </mat-dialog-content>
+    <mat-dialog-actions>
+    <button mat-button (click)="onNoClick()">No Thanks</button>
+    <button mat-button type="submit" cdkFocusInitial>Ok</button>
+    </mat-dialog-actions>
+</form>
