@@ -8,12 +8,14 @@ public class UserInfoResponse {
     private Long id;
     private String username;
     private Collection<GrantedAuthority> roles;
+    private String token;
 
     public UserInfoResponse(Long id, String username,
-                            Collection<GrantedAuthority> roles) {
+                            Collection<GrantedAuthority> roles, String token) {
         this.id = id;
         this.username = username;
         this.roles = roles;
+        this.token = token;
     }
 
     public Long getId() {

@@ -28,8 +28,9 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
-
+@CrossOrigin(origins = "http://localhost:4200", maxAge = 3600)
 @RestController
+@RequestMapping("/api/auth")
 public class UserController {
     @Autowired
     JwtUtils jwtUtils;
@@ -53,8 +54,7 @@ public class UserController {
 
 
 
-
-    @PostMapping("/api/auth/login")
+    @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@Validated @RequestBody LoginDto loginRequest) {
 
         Authentication authentication = authenticationManager
@@ -70,15 +70,18 @@ public class UserController {
                 .map(item -> item.getAuthority())
                 .collect(Collectors.toList());
 
-        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, jwtCookie.toString())
+        return ResponseEntity.ok().header(HttpHeaders.AUTHORIZATION, jwtCookie.toString())
                 .body(new UserInfoResponse(userDetails.getId(),
                         userDetails.getUsername(),
-                        (Collection<GrantedAuthority>) userDetails.getAuthorities()));
+                        (Collection<GrantedAuthority>) userDetails.getAuthorities(),
+                        jwtCookie.toString()
+                        ));
     }
 
 
-    @PostMapping("/api/auth/signup")
+    @PostMapping("/signup")
     public ResponseEntity<?> registerUser(@Validated @RequestBody SignUpDto signUpRequest) {
+        System.out.println("attempting signup");
         if (userRepository.existsByUsername(signUpRequest.getUsername())) {
             return ResponseEntity.badRequest().body(new MessageResponse("Error: Username is already taken!"));
         }
@@ -96,7 +99,7 @@ public class UserController {
         return ResponseEntity.ok(new MessageResponse("User registered successfully!"));
     }
 
-    @PostMapping("/api/auth/signout")
+    @PostMapping("/signout")
     public ResponseEntity<?> logoutUser() {
         ResponseCookie cookie = jwtUtils.getCleanJwtCookie();
         return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString())
